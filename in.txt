@@ -1,0 +1,71 @@
+# Initialization
+
+echo            both
+units		real
+boundary	p p p
+atom_style	full
+
+# Atom Definition
+
+read_data	data.data
+lattice         custom 3.01 a1 1.0 0.0 0.0 a2 0.0 1.41421356 0.0 a3 0.0 0.0 1.41421356  basis 0.0 0.0 0.0  basis 0.0 0.5 0.5
+region          Substrate block -49 49 -49 49 -89 -40 units box 
+create_atoms    5 region Substrate
+group           substrate type 5
+group           HAP type 1 2 3 4
+
+# Dreiding potential information
+
+bond_style      harmonic
+bond_coeff	1 350 0.98
+bond_coeff	2 350 0.98
+bond_coeff	3 350 0.98
+bond_coeff	4 350 0.98 
+bond_coeff      5 350 1.54
+pair_style	hybrid lj/cut 2.5 eam/fs
+pair_coeff      * * eam/fs Ti.eam.fs NULL NULL NULL NULL Ti
+pair_coeff	1 1 lj/cut 0.012 3.472
+pair_coeff	2 2 lj/cut 0.002 3.2
+pair_coeff	3 3 lj/cut 0.104 3.71
+pair_coeff	4 4 lj/cut 0.054 4.295
+pair_coeff	1 2 lj/cut 0.005 3.333
+pair_coeff	1 3 lj/cut 0.035 3.589
+pair_coeff	1 4 lj/cut 0.025 3.862
+pair_coeff	2 3 lj/cut 0.014 3.446
+pair_coeff	2 4 lj/cut 0.010 3.707
+pair_coeff	3 4 lj/cut 0.075 3.992
+pair_coeff	1 5 lj/cut 0.012 3.472
+pair_coeff	2 5 lj/cut 0.005 3.333
+pair_coeff	3 5 lj/cut 0.035 3.589
+pair_coeff	4 5 lj/cut 0.025 3.862
+
+# Equilibration (Langevin dynamics at 300 K)
+
+velocity        all create 300 12345 rot yes mom yes dist uniform
+fix		1 all nve/limit 0.05
+fix		2 all langevin 300.0 300.0 1.0 904297
+fix             3 HAP setforce NULL NULL NULL
+thermo_style	custom step temp pe
+thermo_modify   lost ignore
+thermo_modify   lost/bond ignore 
+thermo          10
+timestep	0.1
+run	        3000
+
+# Run Minimization 
+reset_timestep 0                                        
+thermo         10                                          
+thermo_style   custom step temp pe
+min_style      cg                                            
+minimize       1e-20 1e-20 1000 1000 
+
+unfix 1
+unfix 3
+velocity       substrate create 300 12345 mom yes rot yes dist uniform
+velocity       HAP set 0 0 -9
+fix            1 all nve
+
+# Compute Local Temp
+thermo_modify       lost ignore
+thermo_modify       lost/bond ignore 
+run                 30000000
